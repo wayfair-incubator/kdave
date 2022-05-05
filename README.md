@@ -72,7 +72,7 @@ There are a few requirements when using the Python package
 * Helm client should be installed and exists in the path ($PATH).
 * Copy `versions.yaml` in the config folder to `~/.kdave`
 
-```bash 
+```bash
 pip3 install kdave
 kdave --help
 
