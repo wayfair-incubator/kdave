@@ -86,7 +86,7 @@ jobs:
           with:
             python-version: ${{ env.PYTHON_VERSION }}
         - name: Run mypy
-          uses: jashparekh/mypy-action@v3
+          uses: ./.github/actions/install-dependencies
           with:
             path: 'exporter tests'
 
