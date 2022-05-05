@@ -35,7 +35,7 @@ def setup_package():
         author="Ahmed ElBakry",
         author_email="aelbakry@wayfair.com",
         description="Kubernetes deprecated API versions exporter CLI.",
-        long_description=open("README.md").read(),
+        long_description=open("docs/cli.rst").read(),
         long_description_content_type="text/markdown",
         packages=setuptools.find_packages(
             exclude=["*.tests", "*.tests.*", "tests.*", "tests"]
