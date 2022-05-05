@@ -8,7 +8,7 @@ on:
       branches: ["main"]
 
 env:
-  PYTHON_VERSION: "3.10"
+  PYTHON_VERSION: "3.8"
 
 jobs:
   bandit:
@@ -75,7 +75,7 @@ jobs:
           test-requirements: "true"
 
       - name: Run isort
-        run: isort --recursive --check-only exporter tests
+        run: isort --recursive --profile black --atomic --check-only exporter tests
 
   mypy:
     runs-on: ubuntu-latest
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ "3.7", "3.8", "3.9", "3.10" ]
+        python-version: [ "3.7", "3.8", "3.9" ]
     steps:
         - name: Check out code
           uses: actions/checkout@v3
@@ -115,25 +115,11 @@ jobs:
           # Use always() to always run this step to publish test results when there are test failures
           if: ${{ always() }}
 
-        - name: Upload coverage results artifact
-          uses: actions/upload-artifact@v3
-          with:
-            name: pytest-coverage-${{ matrix.python-version }}
-            path: coverage-${{ matrix.python-version }}.xml
-          # Use always() to always run this step to publish test results when there are test failures
-          if: ${{ always() }}
-
-        - name: Publish coverage results to Codecov
-          uses: codecov/codecov-action@v3.1.0
-          with:
-            file: coverage-${{ matrix.python-version }}.xml
-            fail_ci_if_error: true
-
   verify-wheel:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ "3.7", "3.8", "3.9"]
+        python-version: [ "3.7", "3.8", "3.9" ]
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -147,52 +133,3 @@ jobs:
         with:
           package-import-name: "exporter"
 
-  build-docs:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-
-      - uses: actions/setup-python@v3
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        uses: ./.github/actions/install-dependencies
-        with:
-          requirements: "true"
-          docs-requirements: "true"
-
-      - name: Build Docs
-        run: mkdocs build --strict
-
-      # upload artifact for dev build
-      - name: Upload coverage results artifact
-        if: github.ref != 'refs/heads/main'
-        uses: actions/upload-artifact@v3
-        with:
-          name: docs-site
-          path: site/
-
-  update-dev-docs:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-
-      - uses: actions/setup-python@v3
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        uses: ./.github/actions/install-dependencies
-        with:
-          requirements: "true"
-          docs-requirements: "true"
-
-      - name: Push documentaiton changes
-        uses: ./.github/actions/publish-docs-with-mike
-        with:
-          version_name: dev
