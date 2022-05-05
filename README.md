@@ -35,7 +35,7 @@ Also, if you requested the object from the API server on a specific apiVersion, 
 
 `kdave-server` can be configured via command line arguments. These arguments are also available in the helm chart
 
-#### Available server command line options:
+#### Available server command line options
 
 ``--address``
     The IP address for the Flask server to serve on
@@ -61,26 +61,6 @@ Also, if you requested the object from the API server on a specific apiVersion, 
 ``--helm-binary``
     The helm binary to be used for running helm commands. Default is helm v2. Options: helm or helm3
 
-#### Example of the exported metrics
-
-<details>
-<summary>kdave metrics</summary>
-
-```
-# HELP wf_k8s_deprecated_versions_info Deprecated API versions
-# TYPE wf_k8s_deprecated_versions_info gauge
-wf_k8s_deprecated_versions_info{api_version="extensions/v1beta1",deprecated="true",deprecated_in_version="v1.14.0",k8s_version="v1.21.6-gke.300",kind="Ingress",name="nginx-ing",namespace="nginx",release_last_update="Wed Jan 26 21:49:45 2022",release_name="nginx",removed="false",removed_in_next_2_releases="true",removed_in_next_release="true",removed_in_version="v1.22.0",replacement_api="networking.k8s.io/v1"} 1.0
-# HELP wf_k8s_deployed_releases Total number of the deployed releases
-# TYPE wf_k8s_deployed_releases gauge
-wf_k8s_deployed_releases 92.0
-# HELP wf_k8s_deployed_releases_with_deprecated_api_version Total number of the deployed releases that have deprecated apiVersions
-# TYPE wf_k8s_deployed_releases_with_deprecated_api_version gauge
-wf_k8s_deployed_releases_with_deprecated_api_version 37.0
-# HELP wf_k8s_deployed_releases_with_removed_api_version Total number of the deployed releases that have removed apiVersions
-# TYPE wf_k8s_deployed_releases_with_removed_api_version gauge
-wf_k8s_deployed_releases_with_removed_api_version 31.0
-```
-</details>
 
 ### Using the CLI
 
@@ -94,15 +74,15 @@ There are a few requirements when using the Python package
 * Copy `versions.yaml` in the config folder to `~/.kdave`
 
 ``` 
-$ pip3 install kdave 
-$ kdave --help
+pip3 install kdave 
+kdave --help
 
 ```
 
 #### Using the docker image
 
 ```
-$ docker run --rm -v ~/.kube/config:/home/app/.kube/config aelbakry/kdave:latest --help
+docker run --rm -v ~/.kube/config:/home/app/.kube/config aelbakry/kdave:latest --help
 ```
 
 #### Commands and Command Line Options
@@ -160,20 +140,8 @@ $ docker run --rm -v ~/.kube/config:/home/app/.kube/config aelbakry/kdave:latest
     Removed API versions in next release exit code
 
 #### Examples
-<details>
-<summary>kdave CLI</summary>
 
 ```
-$ kdave check --source /tmp/metallb.yaml
- Checking the used apiVersions:
-+-------------------+-------------------+--------------------+--------------------+-------------+----------+------------------------+---------------------+------------------+
-|  File Name        |  Kind             |  API Version       |  Name              |  Deprecated |  Removed |  Deprecated In Version |  Removed In Version |  Replacement API |
-+-------------------+-------------------+--------------------+--------------------+-------------+----------+------------------------+---------------------+------------------+
-| controller.yaml   | PodSecurityPolicy | extensions/v1beta1 | metallb-speaker    | true        | true     | v1.10.0                | v1.16.0             | policy/v1beta1   |
-| speaker.yaml      | DaemonSet         | apps/v1beta2       | metallb-speaker    | true        | true     | v1.9.0                 | v1.16.0             | apps/v1          |
-| psp.yaml          | Deployment        | apps/v1beta2       | metallb-controller | true        | true     | v1.9.0                 | v1.16.0             | apps/v1          |
-+-------------------+-------------------+--------------------+--------------------+-------------+----------+------------------------+---------------------+------------------+
-
 $ kdave check --release ingress
 [INFO] 2021-07-12 14:22:58 Calling the helm command: [helm get manifest ingress]
 [INFO] 2021-07-12 14:23:03 Checking the used apiVersions for release: ingress
@@ -196,7 +164,6 @@ The PodSecurityPolicy: metallb-speaker uses the removed apiVersion: extensions/v
 $ echo $?
 10
 ```
-</details>
 
 ## How it works
 
@@ -215,17 +182,17 @@ For more details, please check the [Design](docs/design.md) document.
 ## Testing
 
 ```
-$ docker-compose run test
+docker-compose run test
 ```
 
 ## Local Development
 
 ```
-$ python3 -m venv /tmp/kdave-venv
-$ source /tmp/kdave-venv/bin/activate
-$ pip3 install -r requirements.txt 
-$ python3 -m exporter.app 
-$ deactivate
+python3 -m venv /tmp/kdave-venv
+source /tmp/kdave-venv/bin/activate
+pip3 install -r requirements.txt 
+python3 -m exporter.app 
+deactivate
 ```
 
 ## Contributing
