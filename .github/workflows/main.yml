@@ -134,5 +134,5 @@ jobs:
       - name: Verify wheel
         uses: ./.github/actions/verify-wheel
         with:
-          package-import-name: "exporter"
+          package-import-name: "kdave"
 
