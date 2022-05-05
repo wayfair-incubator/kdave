@@ -1,0 +1,302 @@
+
+---
+# Source: test/templates/psp.yaml
+apiVersion: extensions/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: test-speaker
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+spec:
+  hostNetwork: true
+  hostPorts:
+  - min: 7472
+    max: 7472
+  privileged: true
+  allowPrivilegeEscalation: false
+  allowedCapabilities:
+  - 'NET_ADMIN'
+  - 'NET_RAW'
+  - 'SYS_ADMIN'
+  volumes:
+  - '*'
+  fsGroup:
+    rule: RunAsAny
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+---
+# Source: test/templates/service-accounts.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-controller
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+---
+# Source: test/templates/service-accounts.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-speed
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+---
+# Source: test/templates/rbac.yaml
+# Roles
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test:controller
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+rules:
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: [""]
+  resources: ["services/status"]
+  verbs: ["update"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+# Source: test/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test:speaker
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["podsecuritypolicies"]
+  resourceNames: ["test-speaker"]
+  verbs: ["use"]
+---
+# Source: test/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test:speaker
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+subjects:
+- kind: ServiceAccount
+  name: test-speed
+  namespace: ingress
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: test:speaker
+---
+# Source: test/templates/rbac.yaml
+## Role bindings
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test:controller
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+subjects:
+- kind: ServiceAccount
+  name: test-controller
+  namespace: ingress
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: test:controller
+---
+# Source: test/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-config-watcher
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+---
+# Source: test/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-config-watcher
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+subjects:
+- kind: ServiceAccount
+  name: test-controller
+- kind: ServiceAccount
+  name: test-speakers-are-disabled
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: test-config-watcher
+---
+# Source: test/templates/speaker.yaml
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  name: test-speaker
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+    component: speaker
+spec:
+  selector:
+    matchLabels:
+      app: test
+      component: speaker
+      release: "test"
+  template:
+    metadata:
+      labels:
+        heritage: "Tiller"
+        release: "test"
+        chart: test-0.9.7
+        app: test
+        component: speaker
+    spec:
+      serviceAccountName: test-speed
+      terminationGracePeriodSeconds: 0
+      hostNetwork: true
+      containers:
+      - name: speaker
+        image: external/test/speaker:v0.8.1
+        imagePullPolicy: IfNotPresent
+        args:
+        - --port=7472
+        - --config=test-config
+        env:
+        - name: test_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - name: monitoring
+          containerPort: 7472
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_RAW
+      nodeSelector:
+        role: test-SPEAKERS-ARE-DISABLED
+        
+      tolerations:
+        - effect: NoSchedule
+          key: role
+          operator: Equal
+          value: ingress
+---
+# Source: test/templates/controller.yaml
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: test-controller
+  labels:
+    heritage: "Tiller"
+    release: "test"
+    chart: test-0.9.7
+    app: test
+    component: controller
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: test
+      component: controller
+      release: "test"
+  template:
+    metadata:
+      labels:
+        heritage: "Tiller"
+        release: "test"
+        chart: test-0.9.7
+        app: test
+        component: controller
+    spec:
+      serviceAccountName: test-controller
+      terminationGracePeriodSeconds: 0
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # nobody
+      nodeSelector:
+        role: ingress
+        
+      tolerations:
+        - effect: NoSchedule
+          key: role
+          operator: Equal
+          value: ingress
+        
+      containers:
+      - name: controller
+        image: external/test/controller:v0.8.1
+        imagePullPolicy: IfNotPresent
+        args:
+        - --port=7472
+        - --config=test-config
+        ports:
+        - name: monitoring
+          containerPort: 7472
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true

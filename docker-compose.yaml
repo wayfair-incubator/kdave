@@ -1,0 +1,34 @@
+#
+# docker-compose.yaml
+#
+# Docker compose.
+
+version: "3.4"
+
+services:
+  kdave-server:
+    image: aelbakry/kdave-server
+    build:
+      dockerfile: ./docker/kdave-server.dockerfile
+      context: .
+
+  kdave-service:
+    image: aelbakry/kdave-service
+    build:
+      dockerfile: ./docker/kdave-service.dockerfile
+      context: .
+
+  kdave:
+    image: aelbakry/kdave
+    build:
+      dockerfile: ./docker/kdave.dockerfile
+      context: .
+
+  test:
+    build:
+      dockerfile: ./docker/devbox.dockerfile
+      context: .
+    command: docker/run_tests.sh --format-code
+    entrypoint: /bin/bash
+    volumes:
+      - ./:/app
