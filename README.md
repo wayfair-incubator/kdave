@@ -61,7 +61,6 @@ Also, if you requested the object from the API server on a specific apiVersion, 
 ``--helm-binary``
     The helm binary to be used for running helm commands. Default is helm v2. Options: helm or helm3
 
-
 ### Using the CLI
 
 `kdave` CLI is available as a python package and docker image.
@@ -73,15 +72,15 @@ There are a few requirements when using the Python package
 * Helm client should be installed and exists in the path ($PATH).
 * Copy `versions.yaml` in the config folder to `~/.kdave`
 
-``` 
-pip3 install kdave 
+```bash 
+pip3 install kdave
 kdave --help
 
 ```
 
 #### Using the docker image
 
-```
+```bash
 docker run --rm -v ~/.kube/config:/home/app/.kube/config aelbakry/kdave:latest --help
 ```
 
@@ -141,7 +140,7 @@ docker run --rm -v ~/.kube/config:/home/app/.kube/config aelbakry/kdave:latest -
 
 #### Examples
 
-```
+```bash
 $ kdave check --release ingress
 [INFO] 2021-07-12 14:22:58 Calling the helm command: [helm get manifest ingress]
 [INFO] 2021-07-12 14:23:03 Checking the used apiVersions for release: ingress
@@ -181,13 +180,13 @@ For more details, please check the [Design](docs/design.md) document.
 
 ## Testing
 
-```
+```bash
 docker-compose run test
 ```
 
 ## Local Development
 
-```
+```bash
 python3 -m venv /tmp/kdave-venv
 source /tmp/kdave-venv/bin/activate
 pip3 install -r requirements.txt 
