@@ -1,5 +1,3 @@
-# Open Source Project Template
-
 [![CI pipeline status](https://github.com/wayfair-incubator/kdave/workflows/CI/badge.svg?branch=main)][ci]
 [![PyPI](https://img.shields.io/pypi/v/kdave)][pypi]
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/kdave)][pypi]
@@ -35,10 +33,9 @@ Also, if you requested the object from the API server on a specific apiVersion, 
 
 `kdave` can be run as a deployment in the cluster using the latest server docker image `aelbakry/kdave-server`. See `kdave` helm [chart](https://github.com/amelbakry/kdave-chart)
 
-
 `kdave-server` can be configured via command line arguments. These arguments are also available in the helm chart
 
-**Available server command line options**:
+#### Available server command line options:
 
 ``--address``
     The IP address for the Flask server to serve on
@@ -64,7 +61,7 @@ Also, if you requested the object from the API server on a specific apiVersion, 
 ``--helm-binary``
     The helm binary to be used for running helm commands. Default is helm v2. Options: helm or helm3
 
-**Example of the exported metrics**
+#### Example of the exported metrics
 
 <details>
 <summary>kdave metrics</summary>
