@@ -11,7 +11,7 @@
 The kdave (Kubernetes Deprecated API Versions Exporter) checks for any deprecated or removed apiVersions in the cluster and exports them in a Prometheus metrics format. You can integrate it with Prometheus and Alertmanager to receive notifications before upgrading the cluster and break the current workload.
 It exports detailed metrics such as whether the used apiVersion is `deprecated`, `removed`, `removed_in_next_release`, `removed_in_next_2_releases`, `replacement_api`, etc.
 
-Kdave has a CLI to check the apiVersions for different sources including files, folders, charts, releases, and namespaces. You can integrate the CLI with the CI system to check the used apiVersions in the helm chart and
+Kdave has a CLI to check the used Kubernetes apiVersions for different sources including files, folders, charts, releases, and namespaces. You can integrate the CLI with the CI system to check the used apiVersions in the helm chart and
 return a warning message in the Pull request or fail the pipeline. You can control this behavior by changing the exit code with the command line options as explained [below](#commands-and-command-line-options)
 
 For example, you can return a warning message in the Pull request if the helm chart has any deprecated apiVersions, the message will include the replacement apiVersion to be used. Also, you can fail the pipeline if the helm chart has any removed apiVersion or apiVersion that will be removed in the next release. This is an example of [alerting](images/alert-example.png) and [CI integration](images/ci-example-1.png)
