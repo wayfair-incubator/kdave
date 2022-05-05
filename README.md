@@ -1,8 +1,8 @@
-[![CI pipeline status](https://github.com/wayfair-incubator/kdave/workflows/CI/badge.svg?branch=main)][ci]
-[![PyPI](https://img.shields.io/pypi/v/kdave)][pypi]
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/kdave)][pypi]
-[![Checked with mypy](https://img.shields.io/badge/mypy-checked-blue)][mypy-home]
-[![Code style: black](https://img.shields.io/badge/code%20style-black-black.svg)][black-home]
+![CI pipeline status](https://github.com/wayfair-incubator/kdave/workflows/CI/badge.svg?branch=main)
+![PyPI](https://img.shields.io/pypi/v/kdave)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/kdave)
+![Checked with mypy](https://img.shields.io/badge/mypy-checked-blue)
+![Code style: black](https://img.shields.io/badge/code%20style-black-black.svg)
 
 # kdave
 
