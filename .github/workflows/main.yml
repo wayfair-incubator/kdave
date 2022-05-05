@@ -75,13 +75,15 @@ jobs:
           test-requirements: "true"
 
       - name: Run isort
-        run: isort --recursive --profile black --atomic --check-only exporter tests
+        run: isort --recursive --force-grid-wrap 0 --check-only exporter tests
 
   mypy:
     runs-on: ubuntu-latest
     steps:
         - name: Check out code
           uses: actions/checkout@v3
+          with:
+            python-version: ${{ env.PYTHON_VERSION }}
         - name: Run mypy
           uses: jashparekh/mypy-action@v3
           with:
