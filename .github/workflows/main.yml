@@ -1,0 +1,198 @@
+name: CI
+
+# Workflow does NOT trigger on a feature branch until a pull request is created.
+# Workflow will always run when a pull request is merged to the default branch.
+on:
+  pull_request: {}
+  push:
+      branches: ["main"]
+
+env:
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  bandit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          test-requirements: "true"
+
+      - name: Run bandit
+        run: bandit --ini .bandit -r exporter
+
+  black:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          test-requirements: "true"
+
+      - name: Run black
+        run: black --check exporter tests
+
+  flake8:
+    runs-on: ubuntu-latest
+    steps:
+        - name: Check out code
+          uses: actions/checkout@v3
+        - uses: actions/setup-python@v3
+          with:
+            python-version: ${{ env.PYTHON_VERSION }}
+        - name: Install dependencies
+          uses: ./.github/actions/install-dependencies
+          with:
+            test-requirements: "true"
+
+        - name: Run flake8
+          run: flake8 exporter tests
+
+  isort:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          requirements: "true"
+          test-requirements: "true"
+
+      - name: Run isort
+        run: isort --recursive --check-only exporter tests
+
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+        - name: Check out code
+          uses: actions/checkout@v3
+        - name: Run mypy
+          uses: jashparekh/mypy-action@v3
+          with:
+            path: 'exporter tests'
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.7", "3.8", "3.9", "3.10" ]
+    steps:
+        - name: Check out code
+          uses: actions/checkout@v3
+        - uses: actions/setup-python@v3
+          with:
+            python-version: ${{ matrix.python-version }}
+        - name: Install dependencies
+          uses: ./.github/actions/install-dependencies
+          with:
+            requirements: "true"
+            test-requirements: "true"
+
+        - name: Run pytest
+          run: pytest --cov-report xml:coverage-${{ matrix.python-version }}.xml --junitxml=test-results-${{ matrix.python-version }}.xml
+
+        - name: Upload pytest test results artifact
+          uses: actions/upload-artifact@v3
+          with:
+            name: pytest-results-${{ matrix.python-version }}
+            path: test-results-${{ matrix.python-version }}.xml
+          # Use always() to always run this step to publish test results when there are test failures
+          if: ${{ always() }}
+
+        - name: Upload coverage results artifact
+          uses: actions/upload-artifact@v3
+          with:
+            name: pytest-coverage-${{ matrix.python-version }}
+            path: coverage-${{ matrix.python-version }}.xml
+          # Use always() to always run this step to publish test results when there are test failures
+          if: ${{ always() }}
+
+        - name: Publish coverage results to Codecov
+          uses: codecov/codecov-action@v3.1.0
+          with:
+            file: coverage-${{ matrix.python-version }}.xml
+            fail_ci_if_error: true
+
+  verify-wheel:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.7", "3.8", "3.9", "3.10" ]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build wheel
+        uses: ./.github/actions/build-dist
+      - name: Verify wheel
+        uses: ./.github/actions/verify-wheel
+        with:
+          package-import-name: "exporter"
+
+  build-docs:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          requirements: "true"
+          docs-requirements: "true"
+
+      - name: Build Docs
+        run: mkdocs build --strict
+
+      # upload artifact for dev build
+      - name: Upload coverage results artifact
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v3
+        with:
+          name: docs-site
+          path: site/
+
+  update-dev-docs:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          requirements: "true"
+          docs-requirements: "true"
+
+      - name: Push documentaiton changes
+        uses: ./.github/actions/publish-docs-with-mike
+        with:
+          version_name: dev
