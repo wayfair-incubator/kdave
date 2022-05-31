@@ -84,7 +84,7 @@ def cli(ctx, debug):
     "--helm-binary",
     "helm_binary",
     default=HELM_V2_BINARY,
-    help="The helm binary to be used for running helm commands. Default is helm v2.",
+    help='The helm binary to be used for running helm commands.Default is helm v2. Use "helm" for helm V2 and "helm3" for helm V3',
 )
 @click.option(
     "--custom-values",

@@ -327,11 +327,10 @@ def test_get_files__return_single_file__success():
 
 
 def test_get_files__return_files_in_directory__success():
-    assert app.get_files("tests/fixtures/dir") == [
-        "tests/fixtures/dir/file-a.yaml",
-        "tests/fixtures/dir/file-b.yaml",
-        "tests/fixtures/dir/file-c.yaml",
-    ]
+    files = app.get_files("tests/fixtures/dir")
+    assert "tests/fixtures/dir/file-a.yaml" in files
+    assert "tests/fixtures/dir/file-b.yaml" in files
+    assert "tests/fixtures/dir/file-c.yaml" in files
 
 
 def test_get_files__non_existing_directory__log_error_and_return_empty_list(caplog):
@@ -529,6 +528,7 @@ def test_get_deprecations_for_all_releases__update_existing_data__success(mocker
         app.queue.Queue,
         app.threading.Event(),
         HELM_V2_BINARY,
+        "v1.21.0",
         app_data=app.app_data,
         lock=app.lock,
         data_file="tests/fixtures/data.json",
@@ -563,6 +563,7 @@ def test_export_deprecated_versions_metrics__success(mocker):
         mocked_queue,
         mocked_exit_event,
         HELM_V2_BINARY,
+        "v1.21.0",
         app_data=app.app_data,
         lock=mocked_lock,
         data_file="tests/fixtures/data.json",
@@ -574,6 +575,7 @@ def test_export_deprecated_versions_metrics__success(mocker):
         mocked_queue,
         mocked_exit_event,
         HELM_V2_BINARY,
+        "v1.21.0",
         app_data=app.app_data,
         lock=mocked_lock,
         data_file="tests/fixtures/data.json",

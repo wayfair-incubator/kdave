@@ -283,12 +283,17 @@ def helm_list_namespace_releases(helm_binary: str, namespace: str):
         "yaml",
     ]
     cmd = _run_helm_command(helm_command)
-    releases_info = yaml.safe_load(cmd)
-    if releases_info:
-        releases = releases_info["Releases"]
+    releases = yaml.safe_load(cmd)
+
+    if releases:
+        if helm_binary != HELM_V3_BINARY:
+            releases = releases["Releases"]
 
         for release in releases:
-            _releases.append(release["Name"])
+            release_name = (
+                release["name"] if helm_binary == HELM_V3_BINARY else release["Name"]
+            )
+            _releases.append(release_name)
 
     return _releases
 
@@ -316,9 +321,37 @@ def put_all_releases_in_queue(
     exit_event.set()
 
 
+def put_all_releases_v3_in_queue(
+    helm_binary: str, q: queue.Queue, exit_event: threading.Event, max: int
+):
+    exit_event.clear()
+
+    all_releases = helm_list_all_releases(helm_binary, max)
+    releases = yaml.safe_load(all_releases)
+
+    if releases:
+        for release in releases:
+            put_release_in_queue(q, release)
+        next = max
+        remaining_releases = yaml.safe_load(
+            helm_list_all_releases(helm_binary, max, next)
+        )
+        while remaining_releases:
+            for release in remaining_releases:
+                put_release_in_queue(q, release)
+            next = next + max
+            remaining_releases = yaml.safe_load(
+                helm_list_all_releases(helm_binary, max, next)
+            )
+
+    while not q.empty():
+        pass
+
+    exit_event.set()
+
+
 @retry(HelmCommandError, total_tries=10, delay=5)
-def helm_list_all_releases(helm_binary: str, max: int = None, offset: str = None):
-    releases = {}
+def helm_list_all_releases(helm_binary: str, max: int, offset: str = None):
     helm_command = [helm_binary, "list", "--output", "yaml"]
     if helm_binary == HELM_V3_BINARY:
         helm_command.extend(["--all-namespaces"])
@@ -326,7 +359,7 @@ def helm_list_all_releases(helm_binary: str, max: int = None, offset: str = None
         helm_command.extend(["--max", str(max)])
 
     if offset:
-        helm_command.extend(["--offset", offset])
+        helm_command.extend(["--offset", str(offset)])
 
     releases = _run_helm_command(helm_command)
 
@@ -336,20 +369,45 @@ def helm_list_all_releases(helm_binary: str, max: int = None, offset: str = None
 def put_release_in_queue(q: queue.Queue, release: dict):
     q.put(
         {
-            "name": release["Name"],
-            "namespace": release["Namespace"],
-            "release_last_update": release["Updated"],
+            "name": release["Name"] if ("Name" in release) else release["name"],
+            "namespace": release["Namespace"]
+            if ("Namespace" in release)
+            else release["namespace"],
+            "release_last_update": release["Updated"]
+            if ("Updated" in release)
+            else release["updated"],
         }
     )
 
 
-def helm_get(helm_binary: str, release_name: str):
+def helm_get(helm_binary: str, release_name: str, namespace: str = None):
     helm_command = [helm_binary, "get", "manifest", release_name]
+    if helm_binary == HELM_V3_BINARY:
+        if not namespace:
+            logger.info(
+                "The namespace is required in helm v3. "
+                "Defaulting to the release name since the namespace is not provided."
+            )
+            namespace = release_name
+
+        helm_command.extend(["--namespace", namespace])
+
     return _run_helm_command(helm_command)
 
 
-def helm_release_exists(helm_binary: str, release_name: str) -> bool:
+def helm_release_exists(
+    helm_binary: str, release_name: str, namespace: str = None
+) -> bool:
     helm_command = [helm_binary, "get", release_name]
+    if helm_binary == HELM_V3_BINARY:
+        if not namespace:
+            logger.info(
+                "The namespace is required in helm v3. "
+                "Defaulting to the release name since the namespace is not provided."
+            )
+            namespace = release_name
+
+        helm_command.extend(["--namespace", namespace])
     try:
         _run_helm_command(helm_command)
     except HelmCommandError:
