@@ -27,6 +27,7 @@ from exporter.constants import (
     DEFAULT_VERSIONS_FILE,
     HELM_TEMPLATE_TMP_DIRECTORY,
     HELM_V2_BINARY,
+    HELM_V3_BINARY,
 )
 from exporter.exceptions import (
     DeprecatedAPIVersionError,
@@ -50,6 +51,7 @@ from exporter.helper import (
     load_yaml_file,
     parse_duration,
     put_all_releases_in_queue,
+    put_all_releases_v3_in_queue,
 )
 
 app = Flask(__name__)
@@ -250,7 +252,8 @@ def parse_semver(version: str):
     > parse_semver(v1.18.16) returns 1.18.16
     > parse_semver(v1.21.0-alpha.1) returns 1.21.0
     > parse_semver(v1.21.0-rc.0) returns 1.21.0
-    If the version is not valid k8s version, it'll raise InvalidSemVerError which will be handled by other functions.
+    If the version is not valid k8s version,
+    It'll raise InvalidSemVerError which will be handled by other functions.
     """
     if re.match(r"(v?)(\d+\.\d+\.?\d*)(.*?)", version):
         match = re.match(r"(v?)(\d+\.\d+\.?\d*)(.*?)", version)
@@ -281,17 +284,12 @@ def _k8s_version():
     return k8s_version
 
 
-def check_deprecations(data: dict, k8s_version: str = None):
+def check_deprecations(data: dict, k8s_version: str):
     """
     Check the deprecated apiVersions based on the current or provided K8s version
     and the source of truth yaml file "versions.yaml"
     """
     result = {}
-
-    if not k8s_version:
-        current_k8s_version = _k8s_version()
-
-    version = k8s_version if k8s_version else current_k8s_version
 
     deprecations = get_all_deprecations()
 
@@ -299,14 +297,14 @@ def check_deprecations(data: dict, k8s_version: str = None):
         deprecated = (
             "true"
             if is_deprecated_version(
-                data["kind"], data["apiVersion"], version, deprecations
+                data["kind"], data["apiVersion"], k8s_version, deprecations
             )
             else "false"
         )
         removed = (
             "true"
             if is_removed_version(
-                data["kind"], data["apiVersion"], version, deprecations
+                data["kind"], data["apiVersion"], k8s_version, deprecations
             )
             else "false"
         )
@@ -325,14 +323,14 @@ def check_deprecations(data: dict, k8s_version: str = None):
             result["kind"] = data["kind"]
             result["api_version"] = data["apiVersion"]
             result["name"] = data["metadata"]["name"]
-            result["k8s_version"] = version
+            result["k8s_version"] = k8s_version
 
             result["removed_in_next_release"] = (
                 "true"
                 if is_removed_version(
                     data["kind"],
                     data["apiVersion"],
-                    increment_semver(version, 1),
+                    increment_semver(k8s_version, 1),
                     deprecations,
                 )
                 else "false"
@@ -342,7 +340,7 @@ def check_deprecations(data: dict, k8s_version: str = None):
                 if is_removed_version(
                     data["kind"],
                     data["apiVersion"],
-                    increment_semver(version, 2),
+                    increment_semver(k8s_version, 2),
                     deprecations,
                 )
                 else "false"
@@ -358,6 +356,8 @@ def check_deprecations_in_files(source: str, k8s_version: str = None):
     """
     result = []
 
+    version = k8s_version if k8s_version else _k8s_version()
+
     try:
         data = load_yaml_file(source)
 
@@ -366,9 +366,9 @@ def check_deprecations_in_files(source: str, k8s_version: str = None):
 
     if isinstance(data, list):
         for dep in data:
-            result.append(check_deprecations(dep, k8s_version))
+            result.append(check_deprecations(dep, version))
     else:
-        result.append(check_deprecations(data, k8s_version))
+        result.append(check_deprecations(data, version))
 
     return result
 
@@ -576,13 +576,15 @@ def raise_api_versions_exception(deprecations: List[Dict]) -> None:
         raise DeprecatedAPIVersionError
 
 
-def get_kinds_from_helm_release(helm_binary: str, release_name: str):
+def get_kinds_from_helm_release(
+    helm_binary: str, release_name: str, namespace: str = None
+):
     """
-    Get all kinds from a helm release a long with the apiVersions to check the deprection
+    Get all kinds from a helm release a long with the apiVersions to check the deprecation
     """
     result: List = []
     try:
-        release_info = helm_get(helm_binary, release_name)
+        release_info = helm_get(helm_binary, release_name, namespace)
     except HelmCommandError:
         logger.warning(f"release: {release_name} not found.")
         return result
@@ -615,14 +617,16 @@ def get_deployed_deprecated_kinds(
     Get the deprecated apiVersions for the deployed kinds which are fetched from a helm release.
     """
     result: List = []
-    kinds = get_kinds_from_helm_release(helm_binary, release_name)
+    version = k8s_version if k8s_version else _k8s_version()
+
+    kinds = get_kinds_from_helm_release(helm_binary, release_name, namespace)
 
     if not kinds:
         return result
 
     logger.info(f"Checking the used apiVersions for release: {release_name}")
     for _kind in kinds:
-        dep = check_deprecations(_kind, k8s_version)
+        dep = check_deprecations(_kind, version)
         if dep:
             dep["release_name"] = release_name
             dep["namespace"] = namespace if namespace else release_name
@@ -636,6 +640,7 @@ def handle_release_deprecation(
     exit_event: threading.Event,
     lock: threading.Lock,
     helm_binary: str,
+    k8s_version: str,
     data: list,
     release_stats: list,
 ):
@@ -649,7 +654,7 @@ def handle_release_deprecation(
                 helm_binary,
                 release_info["name"],
                 release_info["namespace"],
-                k8s_version=None,
+                k8s_version=k8s_version,
             )
             deprecated = "false"
             removed = "false"
@@ -695,6 +700,7 @@ def get_deprecations_for_all_releases(
     q: queue.Queue,
     exit_event: threading.Event,
     helm_binary: str,
+    k8s_version: str,
     app_data=app_data,
     lock=lock,
     data_file: str = DATA_FILE,
@@ -717,7 +723,11 @@ def get_deprecations_for_all_releases(
         start = time.time()
 
         put_releases_in_queue = threading.Thread(
-            target=put_all_releases_in_queue,
+            target=(
+                put_all_releases_v3_in_queue
+                if helm_binary == HELM_V3_BINARY
+                else put_all_releases_in_queue
+            ),
             name="put_releases_in_queue",
             daemon=True,
             kwargs={
@@ -742,6 +752,7 @@ def get_deprecations_for_all_releases(
                     "exit_event": exit_event,
                     "lock": _lock,
                     "helm_binary": helm_binary,
+                    "k8s_version": k8s_version,
                     "data": data,
                     "release_stats": release_stats,
                 },
@@ -837,6 +848,7 @@ def export_deprecated_versions_metrics(
     q: queue.Queue,
     exit_event: threading.Event,
     helm_binary: str,
+    k8s_version: str,
     app_data: dict = app_data,
     lock=lock,  # Manager.Lock
     data_file: str = DATA_FILE,
@@ -853,6 +865,7 @@ def export_deprecated_versions_metrics(
                 q,
                 exit_event,
                 helm_binary,
+                k8s_version,
                 max=max,
                 app_data=app_data,
                 lock=lock,
@@ -1048,7 +1061,7 @@ def get_arguments():
     parser.add_argument(
         "-b",
         "--helm-binary",
-        help="The helm binary to be used for running helm commands. Default is helm v2.",
+        help='The helm binary to be used for running helm commands.Default is helm v2. Use "helm" for helm V2 and "helm3" for helm V3',
         type=str,
         default=HELM_V2_BINARY,
     )
@@ -1069,6 +1082,7 @@ if __name__ == "__main__":
     app_server = WSGIServer((args.address, args.port), app)
     logger.info("Starting kdave server.")
     logger.info(f"Running on http://{args.address}:{args.port}/")
+    k8s_version = _k8s_version()
 
     flask_app = multiprocessing.Process(
         name="flask-app", target=app_server.serve_forever
@@ -1076,7 +1090,7 @@ if __name__ == "__main__":
     helm = multiprocessing.Process(
         name="helm-handler",
         target=export_deprecated_versions_metrics,
-        args=(args.threads, q, exit_event, helm_binary),
+        args=(args.threads, q, exit_event, helm_binary, k8s_version),
         kwargs={"data_file": args.data_file, "max": args.max},
     )
 

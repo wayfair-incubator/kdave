@@ -115,7 +115,7 @@ docker run --rm -v ~/.kube/config:/home/app/.kube/config aelbakry/kdave:latest -
     The Kubernetes version. If not provided, it defaults to the current cluster version
 
 ``--helm-binary``
-    The helm binary to be used for running helm commands. Default is helm v2
+    The helm binary to be used for running helm commands. Default is helm v2. Use "helm" for helm V2 and "helm3" for helm V3
 
 ``--output-dir``
     The output directory used to template the chart
