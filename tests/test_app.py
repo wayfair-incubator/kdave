@@ -327,11 +327,10 @@ def test_get_files__return_single_file__success():
 
 
 def test_get_files__return_files_in_directory__success():
-    assert app.get_files("tests/fixtures/dir") == [
-        "tests/fixtures/dir/file-a.yaml",
-        "tests/fixtures/dir/file-b.yaml",
-        "tests/fixtures/dir/file-c.yaml",
-    ]
+    files = app.get_files("tests/fixtures/dir")
+    assert "tests/fixtures/dir/file-a.yaml" in files
+    assert "tests/fixtures/dir/file-b.yaml" in files
+    assert "tests/fixtures/dir/file-c.yaml" in files
 
 
 def test_get_files__non_existing_directory__log_error_and_return_empty_list(caplog):
