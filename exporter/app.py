@@ -638,6 +638,7 @@ def get_deployed_deprecated_kinds(
 def handle_release_deprecation(
     q: queue.Queue,
     exit_event: threading.Event,
+    error_event: threading.Event,
     lock: threading.Lock,
     helm_binary: str,
     k8s_version: str,
@@ -647,7 +648,7 @@ def handle_release_deprecation(
     result = []
     releases = []
 
-    while not exit_event.is_set():
+    while (not exit_event.is_set() or not q.empty()) and not error_event.is_set():
         try:
             release_info = q.get_nowait()
             deprecated_kinds = get_deployed_deprecated_kinds(
@@ -679,6 +680,9 @@ def handle_release_deprecation(
                 result.append(dep)
         except queue.Empty:
             pass
+        except:
+            error_event.set()
+            raise
 
     with lock:
         append_to_list(result, data)
@@ -699,6 +703,7 @@ def get_deprecations_for_all_releases(
     threads: int,
     q: queue.Queue,
     exit_event: threading.Event,
+    error_event: threading.Event,
     helm_binary: str,
     k8s_version: str,
     app_data=app_data,
@@ -734,8 +739,9 @@ def get_deprecations_for_all_releases(
                 "helm_binary": helm_binary,
                 "q": q,
                 "exit_event": exit_event,
+                "error_event": error_event,
                 "max": max,
-            },
+            }
         )
 
         put_releases_in_queue.start()
@@ -750,6 +756,7 @@ def get_deprecations_for_all_releases(
                 kwargs={
                     "q": q,
                     "exit_event": exit_event,
+                    "error_event": error_event,
                     "lock": _lock,
                     "helm_binary": helm_binary,
                     "k8s_version": k8s_version,
@@ -766,6 +773,12 @@ def get_deprecations_for_all_releases(
         put_releases_in_queue.join()
         end = time.time()
         duration_seconds = int(end - start)
+    if error_event.is_set():
+        logger.error("Updating helm release information was not successful. Cooldown for 10 minutes...")
+        time.sleep(600)
+        with lock:
+            app_data["processing"] = False
+        return
 
     update_global_app_data(
         data,
@@ -847,6 +860,7 @@ def export_deprecated_versions_metrics(
     threads: int,
     q: queue.Queue,
     exit_event: threading.Event,
+    error_event: threading.Event,
     helm_binary: str,
     k8s_version: str,
     app_data: dict = app_data,
@@ -864,6 +878,7 @@ def export_deprecated_versions_metrics(
                 threads,
                 q,
                 exit_event,
+                error_event,
                 helm_binary,
                 k8s_version,
                 max=max,
@@ -1077,6 +1092,7 @@ if __name__ == "__main__":
     helm_binary = args.helm_binary
     q: queue.Queue = queue.Queue()
     exit_event = threading.Event()
+    error_event = threading.Event()
     logger = _logger()
 
     app_server = WSGIServer((args.address, args.port), app)
@@ -1090,7 +1106,7 @@ if __name__ == "__main__":
     helm = multiprocessing.Process(
         name="helm-handler",
         target=export_deprecated_versions_metrics,
-        args=(args.threads, q, exit_event, helm_binary, k8s_version),
+        args=(args.threads, q, exit_event, error_event, helm_binary, k8s_version),
         kwargs={"data_file": args.data_file, "max": args.max},
     )
 

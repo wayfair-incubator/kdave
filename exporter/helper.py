@@ -299,55 +299,71 @@ def helm_list_namespace_releases(helm_binary: str, namespace: str):
 
 
 def put_all_releases_in_queue(
-    helm_binary: str, q: queue.Queue, exit_event: threading.Event, max: int = None
+    helm_binary: str,
+    q: queue.Queue,
+    exit_event: threading.Event,
+    error_event: threading.Event,
+    max: int = None
 ):
     exit_event.clear()
+    error_event.clear()
 
-    all_releases = helm_list_all_releases(helm_binary, max)
-    releases_info = yaml.safe_load(all_releases)
-    if releases_info:
-        releases = releases_info["Releases"]
-        for release in releases:
-            put_release_in_queue(q, release)
-        next = releases_info.get("Next")
-        while next:
-            remaining_releases = helm_list_all_releases(helm_binary, max, next)
-            next = yaml.safe_load(remaining_releases)["Next"]
-            for release in yaml.safe_load(remaining_releases)["Releases"]:
+    try:
+        all_releases = helm_list_all_releases(helm_binary, max)
+        releases_info = yaml.safe_load(all_releases)
+        if releases_info:
+            releases = releases_info["Releases"]
+            for release in releases:
                 put_release_in_queue(q, release)
-    while not q.empty():
-        pass
+            next = releases_info.get("Next")
+            while next and not error_event.is_set():
+                remaining_releases = helm_list_all_releases(helm_binary, max, next)
+                next = yaml.safe_load(remaining_releases)["Next"]
+                for release in yaml.safe_load(remaining_releases)["Releases"]:
+                    put_release_in_queue(q, release)
+        while not q.empty():
+            pass
 
-    exit_event.set()
-
+        exit_event.set()
+    except:
+        error_event.set()
+        raise
 
 def put_all_releases_v3_in_queue(
-    helm_binary: str, q: queue.Queue, exit_event: threading.Event, max: int
+    helm_binary: str,
+    q: queue.Queue,
+    exit_event: threading.Event,
+    error_event: threading.Event,
+    max: int
 ):
     exit_event.clear()
+    error_event.clear()
 
-    all_releases = helm_list_all_releases(helm_binary, max)
-    releases = yaml.safe_load(all_releases)
+    try:
+        all_releases = helm_list_all_releases(helm_binary, max)
+        releases = yaml.safe_load(all_releases)
 
-    if releases:
-        for release in releases:
-            put_release_in_queue(q, release)
-        next = max
-        remaining_releases = yaml.safe_load(
-            helm_list_all_releases(helm_binary, max, next)
-        )
-        while remaining_releases:
-            for release in remaining_releases:
+        if releases:
+            for release in releases:
                 put_release_in_queue(q, release)
-            next = next + max
+            next = max
             remaining_releases = yaml.safe_load(
                 helm_list_all_releases(helm_binary, max, next)
             )
+            while remaining_releases:
+                for release in remaining_releases:
+                    put_release_in_queue(q, release)
+                next = next + max
+                remaining_releases = yaml.safe_load(
+                    helm_list_all_releases(helm_binary, max, next)
+                )
 
-    while not q.empty():
-        pass
-
-    exit_event.set()
+        while not q.empty():
+            pass
+        exit_event.set()
+    except:
+        error_event.set()
+        raise
 
 
 @retry(HelmCommandError, total_tries=10, delay=5)
