@@ -358,9 +358,6 @@ def put_all_releases_v3_in_queue(
                 remaining_releases = yaml.safe_load(
                     helm_list_all_releases(helm_binary, max, next)
                 )
-
-        while not q.empty():
-            pass
         exit_event.set()
     except BaseException:
         error_event.set()
