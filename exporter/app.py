@@ -636,7 +636,7 @@ def get_deployed_deprecated_kinds(
     return result
 
 
-def handle_release_deprecation(
+def handle_release_deprecation(  # noqa: C901
     q: queue.Queue,
     exit_event: threading.Event,
     error_event: threading.Event,
@@ -681,7 +681,7 @@ def handle_release_deprecation(
                 result.append(dep)
         except queue.Empty:
             pass
-        except:
+        except BaseException:
             error_event.set()
             raise
 
@@ -934,7 +934,7 @@ def app_is_healthy():
         )
     if app_data["error_triggered"]:
         raise JobExecutionError(
-            f"The helm check releases job did not succeed"
+            "The helm check releases job did not succeed"
         )
 
     return "OK"

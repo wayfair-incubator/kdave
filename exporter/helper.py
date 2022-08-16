@@ -325,9 +325,10 @@ def put_all_releases_in_queue(
             pass
 
         exit_event.set()
-    except:
+    except BaseException:
         error_event.set()
         raise
+
 
 def put_all_releases_v3_in_queue(
     helm_binary: str,
@@ -361,7 +362,7 @@ def put_all_releases_v3_in_queue(
         while not q.empty():
             pass
         exit_event.set()
-    except:
+    except BaseException:
         error_event.set()
         raise
 
