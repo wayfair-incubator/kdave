@@ -64,6 +64,7 @@ delay = "2h"
 app_data: dict = manager.dict(  # type: ignore
     processing=False,
     run_helm_update=False,
+    error_triggered=False,
     deprecations=[],
     release_stats=[],
     last_run="",
@@ -774,10 +775,9 @@ def get_deprecations_for_all_releases(
         end = time.time()
         duration_seconds = int(end - start)
     if error_event.is_set():
-        logger.error("Updating helm release information was not successful. Cooldown for 10 minutes...")
-        time.sleep(600)
+        logger.error("Updating helm release information was not successful.")
         with lock:
-            app_data["processing"] = False
+            app_data["error_triggered"] = True
         return
 
     update_global_app_data(
@@ -931,6 +931,10 @@ def app_is_healthy():
     if is_older_than(accepted_delay, datetime.fromisoformat(app_data["last_run"])):
         raise JobExecutionError(
             f"The helm check releases job didn't run for {accepted_delay}."
+        )
+    if app_data["error_triggered"]:
+        raise JobExecutionError(
+            f"The helm check releases job did not succeed"
         )
 
     return "OK"
