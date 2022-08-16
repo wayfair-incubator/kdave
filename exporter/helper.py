@@ -303,7 +303,7 @@ def put_all_releases_in_queue(
     q: queue.Queue,
     exit_event: threading.Event,
     error_event: threading.Event,
-    max: int = None
+    max: int = None,
 ):
     exit_event.clear()
     error_event.clear()
@@ -335,7 +335,7 @@ def put_all_releases_v3_in_queue(
     q: queue.Queue,
     exit_event: threading.Event,
     error_event: threading.Event,
-    max: int
+    max: int,
 ):
     exit_event.clear()
     error_event.clear()
