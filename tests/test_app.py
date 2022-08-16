@@ -527,6 +527,7 @@ def test_get_deprecations_for_all_releases__update_existing_data__success(mocker
         1,
         app.queue.Queue,
         app.threading.Event(),
+        app.threading.Event(),
         HELM_V2_BINARY,
         "v1.21.0",
         app_data=app.app_data,
@@ -551,6 +552,7 @@ def test_load_from_data_file__success():
 def test_export_deprecated_versions_metrics__success(mocker):
     mocked_queue = mocker.patch("exporter.app.queue.Queue")
     mocked_exit_event = mocker.patch("exporter.app.threading.Event")
+    mocked_error_event = mocker.patch("exporter.app.threading.Event")
     mocked_lock = mocker.patch("exporter.app.manager.Lock")
 
     app.app_data["run_helm_update"] = True
@@ -562,6 +564,7 @@ def test_export_deprecated_versions_metrics__success(mocker):
         1,
         mocked_queue,
         mocked_exit_event,
+        mocked_error_event,
         HELM_V2_BINARY,
         "v1.21.0",
         app_data=app.app_data,
@@ -574,6 +577,7 @@ def test_export_deprecated_versions_metrics__success(mocker):
         1,
         mocked_queue,
         mocked_exit_event,
+        mocked_error_event,
         HELM_V2_BINARY,
         "v1.21.0",
         app_data=app.app_data,
