@@ -249,6 +249,7 @@ def test_helm_list_namespace_releases__return_releases__success(mocker):
 def test_helm_list_releases__get_all_releases_without_offset__success(mocker):
     queue_mocker = mocker.patch("exporter.helper.queue.Queue")
     exit_event_mocker = mocker.patch("exporter.helper.threading.Event")
+    error_event_mocker = mocker.patch("exporter.helper.threading.Event")
     mock_stdout = MagicMock()
     result = {
         "Releases": [
@@ -263,7 +264,9 @@ def test_helm_list_releases__get_all_releases_without_offset__success(mocker):
         "exporter.helper.subprocess.run", return_value=mock_stdout
     )
 
-    helper.put_all_releases_in_queue(HELM_V2_BINARY, queue_mocker, exit_event_mocker)
+    helper.put_all_releases_in_queue(
+        HELM_V2_BINARY, queue_mocker, exit_event_mocker, error_event_mocker
+    )
 
     helm_command = [HELM_V2_BINARY, "list", "--output", "yaml"]
 

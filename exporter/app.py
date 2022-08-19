@@ -64,6 +64,7 @@ delay = "2h"
 app_data: dict = manager.dict(  # type: ignore
     processing=False,
     run_helm_update=False,
+    error_triggered=False,
     deprecations=[],
     release_stats=[],
     last_run="",
@@ -113,7 +114,7 @@ def _logger():
 
 
 def get_all_deprecations(versions_file: str = DEFAULT_VERSIONS_FILE):
-    """"
+    """ "
     Get all the deprecated apiVersions from versions.yaml file
     """
     home_dir = os.getenv("HOME")
@@ -236,7 +237,7 @@ def get_deprecated_kind_info(kind: str, apiVersion: str, all_deprecated_versions
 
 
 def is_newer_or_equal_version(current_k8s_version, yaml_file_version):
-    """ Compare two SemVersions """
+    """Compare two SemVersions"""
     if semver.compare(
         parse_semver(current_k8s_version), parse_semver(yaml_file_version)
     ) in [0, 1]:
@@ -273,7 +274,7 @@ def increment_semver(version: str, steps: int):
 
 
 def _k8s_version():
-    """ Get current K8s version """
+    """Get current K8s version"""
     client = k8sClient()
     try:
         k8s_version = client.k8s_version()
@@ -449,7 +450,7 @@ def check_deprecations_all(
 
 
 def handle_deprecation_in_files_output(k8s_version: str, files: list):
-    """"
+    """
     This function handles the deprecated apiVersions result by appending the file name to the output
     """
     result: List = []
@@ -635,9 +636,10 @@ def get_deployed_deprecated_kinds(
     return result
 
 
-def handle_release_deprecation(
+def handle_release_deprecation(  # noqa: C901
     q: queue.Queue,
     exit_event: threading.Event,
+    error_event: threading.Event,
     lock: threading.Lock,
     helm_binary: str,
     k8s_version: str,
@@ -647,7 +649,7 @@ def handle_release_deprecation(
     result = []
     releases = []
 
-    while not exit_event.is_set():
+    while (not exit_event.is_set() or not q.empty()) and not error_event.is_set():
         try:
             release_info = q.get_nowait()
             deprecated_kinds = get_deployed_deprecated_kinds(
@@ -679,6 +681,9 @@ def handle_release_deprecation(
                 result.append(dep)
         except queue.Empty:
             pass
+        except BaseException:
+            error_event.set()
+            raise
 
     with lock:
         append_to_list(result, data)
@@ -699,6 +704,7 @@ def get_deprecations_for_all_releases(
     threads: int,
     q: queue.Queue,
     exit_event: threading.Event,
+    error_event: threading.Event,
     helm_binary: str,
     k8s_version: str,
     app_data=app_data,
@@ -734,6 +740,7 @@ def get_deprecations_for_all_releases(
                 "helm_binary": helm_binary,
                 "q": q,
                 "exit_event": exit_event,
+                "error_event": error_event,
                 "max": max,
             },
         )
@@ -750,6 +757,7 @@ def get_deprecations_for_all_releases(
                 kwargs={
                     "q": q,
                     "exit_event": exit_event,
+                    "error_event": error_event,
                     "lock": _lock,
                     "helm_binary": helm_binary,
                     "k8s_version": k8s_version,
@@ -766,6 +774,11 @@ def get_deprecations_for_all_releases(
         put_releases_in_queue.join()
         end = time.time()
         duration_seconds = int(end - start)
+    if error_event.is_set():
+        logger.error("Updating helm release information was not successful.")
+        with lock:
+            app_data["error_triggered"] = True
+        return
 
     update_global_app_data(
         data,
@@ -847,6 +860,7 @@ def export_deprecated_versions_metrics(
     threads: int,
     q: queue.Queue,
     exit_event: threading.Event,
+    error_event: threading.Event,
     helm_binary: str,
     k8s_version: str,
     app_data: dict = app_data,
@@ -864,6 +878,7 @@ def export_deprecated_versions_metrics(
                 threads,
                 q,
                 exit_event,
+                error_event,
                 helm_binary,
                 k8s_version,
                 max=max,
@@ -917,6 +932,8 @@ def app_is_healthy():
         raise JobExecutionError(
             f"The helm check releases job didn't run for {accepted_delay}."
         )
+    if app_data["error_triggered"]:
+        raise JobExecutionError("The helm check releases job did not succeed")
 
     return "OK"
 
@@ -1077,6 +1094,7 @@ if __name__ == "__main__":
     helm_binary = args.helm_binary
     q: queue.Queue = queue.Queue()
     exit_event = threading.Event()
+    error_event = threading.Event()
     logger = _logger()
 
     app_server = WSGIServer((args.address, args.port), app)
@@ -1090,7 +1108,7 @@ if __name__ == "__main__":
     helm = multiprocessing.Process(
         name="helm-handler",
         target=export_deprecated_versions_metrics,
-        args=(args.threads, q, exit_event, helm_binary, k8s_version),
+        args=(args.threads, q, exit_event, error_event, helm_binary, k8s_version),
         kwargs={"data_file": args.data_file, "max": args.max},
     )
 
