@@ -196,7 +196,7 @@ def helm_build_dependencies(helm_binary: str, chart_path: str):
     _run_helm_command(helm_command)
 
 
-def helm_template( # noqa: C901
+def helm_template(  # noqa: C901
     chart_path: str,
     output_dir: str,
     helm_binary: str,

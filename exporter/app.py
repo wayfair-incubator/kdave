@@ -1141,15 +1141,7 @@ if __name__ == "__main__":
     helm = multiprocessing.Process(
         name="helm-handler",
         target=export_deprecated_versions_metrics,
-        args=(
-            args.threads,
-            q,
-            exit_event,
-            error_event,
-            helm_binary,
-            k8s_version,
-            max,
-        ),
+        args=(args.threads, q, exit_event, error_event, helm_binary, k8s_version, max),
         kwargs={"data_file": args.data_file, "helm_version": args.helm_version},
     )
 
