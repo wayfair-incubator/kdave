@@ -523,13 +523,16 @@ def test_get_deployed_deprecated_kinds__success(mocker):
 
 
 def test_get_deprecations_for_all_releases__update_existing_data__success(mocker):
+    K8s_VERSION = "v1.21.0"
+    MAXIMUM = 256
     app.get_deprecations_for_all_releases(
         1,
         app.queue.Queue,
         app.threading.Event(),
         app.threading.Event(),
         HELM_V2_BINARY,
-        "v1.21.0",
+        K8s_VERSION,
+        MAXIMUM,
         app_data=app.app_data,
         lock=app.lock,
         data_file="tests/fixtures/data.json",
@@ -550,6 +553,8 @@ def test_load_from_data_file__success():
 
 
 def test_export_deprecated_versions_metrics__success(mocker):
+    K8s_VERSION = "v1.21.0"
+    MAXIMUM = 256
     mocked_queue = mocker.patch("exporter.app.queue.Queue")
     mocked_exit_event = mocker.patch("exporter.app.threading.Event")
     mocked_error_event = mocker.patch("exporter.app.threading.Event")
@@ -566,12 +571,12 @@ def test_export_deprecated_versions_metrics__success(mocker):
         mocked_exit_event,
         mocked_error_event,
         HELM_V2_BINARY,
-        "v1.21.0",
+        K8s_VERSION,
+        MAXIMUM,
         app_data=app.app_data,
         lock=mocked_lock,
         data_file="tests/fixtures/data.json",
         run_once=True,
-        max=100,
     )
     get_deprecations_for_all_releases_mocker.assert_called_with(
         1,
@@ -579,11 +584,12 @@ def test_export_deprecated_versions_metrics__success(mocker):
         mocked_exit_event,
         mocked_error_event,
         HELM_V2_BINARY,
-        "v1.21.0",
+        K8s_VERSION,
+        MAXIMUM,
         app_data=app.app_data,
         lock=mocked_lock,
         data_file="tests/fixtures/data.json",
-        max=100,
+        helm_version=None,
     )
 
 

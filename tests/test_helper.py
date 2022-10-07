@@ -9,7 +9,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from exporter import helper
-from exporter.constants import HELM_TEMPLATE_TMP_DIRECTORY, HELM_V2_BINARY
+from exporter.constants import (
+    HELM_2_AND_3_VERSION,
+    HELM_TEMPLATE_TMP_DIRECTORY,
+    HELM_V2_BINARY,
+    MAXIMUM,
+)
 from exporter.exceptions import (
     HelmChartYamlFileMissing,
     HelmCommandError,
@@ -264,15 +269,38 @@ def test_helm_list_releases__get_all_releases_without_offset__success(mocker):
         "exporter.helper.subprocess.run", return_value=mock_stdout
     )
 
-    helper.put_all_releases_in_queue(
-        HELM_V2_BINARY, queue_mocker, exit_event_mocker, error_event_mocker
+    helper.put_all_helm_releases_in_queue(
+        HELM_V2_BINARY, queue_mocker, exit_event_mocker, error_event_mocker, MAXIMUM
     )
 
-    helm_command = [HELM_V2_BINARY, "list", "--output", "yaml"]
+    helm_command = [HELM_V2_BINARY, "list", "--output", "yaml", "--max", f"{MAXIMUM}"]
 
     sub_process_mock.assert_called_with(
         helm_command, capture_output=True, check=True, stdout=None
     )
+
+
+def test_put_all_helm_releases_in_queue__helm_version__has_precedence_over_helm_binary(
+    mocker,
+):
+    queue_mocker = mocker.patch("exporter.helper.queue.Queue")
+    exit_event_mocker = mocker.patch("exporter.helper.threading.Event")
+    error_event_mocker = mocker.patch("exporter.helper.threading.Event")
+
+    put_helm_v2_mocker = mocker.patch("exporter.helper.put_helm_v2_releases_in_queue")
+    put_helm_v3_mocker = mocker.patch("exporter.helper.put_helm_v3_releases_in_queue")
+
+    helper.put_all_helm_releases_in_queue(
+        HELM_V2_BINARY,
+        queue_mocker,
+        exit_event_mocker,
+        error_event_mocker,
+        MAXIMUM,
+        helm_version=HELM_2_AND_3_VERSION,
+    )
+
+    put_helm_v2_mocker.assert_called_once()
+    put_helm_v3_mocker.assert_called_once()
 
 
 def test_helm_get__success(mocker):
