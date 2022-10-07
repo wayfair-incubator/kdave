@@ -47,7 +47,7 @@ Also, if you requested the object from the API server on a specific apiVersion, 
     The number of threads to handle helm check releases
 
 ``--max``
-    Maximum number of releases to fetch
+    Maximum number of releases to fetch (Default: 256)
 
 ``--interval``
     The interval between helm check releases jobs. Accepted suffix (s, m, h, d, w). Default is (1d)"
@@ -59,7 +59,10 @@ Also, if you requested the object from the API server on a specific apiVersion, 
     The database file location
 
 ``--helm-binary``
-    The helm binary to be used for running helm commands. Default is helm v2. Options: helm or helm3
+    The helm binary to be used. Default is helm v2. Use "helm" for helm V2 and "helm3" for helm V3
+
+``--helm-version``
+    The helm version to be used to collect the deployed releases. This argument can be used to collect the releases of helm v2 and helm v3 simultaneously. Default is v2. Use "v2" for helm V2, "v3" for helm V3, and "v23" for both helm v2 and v3 releases. When providing this argument, helm binary is not considered since the default binary of the provided helm version will be used
 
 ### Using the CLI
 
@@ -115,7 +118,7 @@ docker run --rm -v ~/.kube/config:/home/app/.kube/config aelbakry/kdave:latest -
     The Kubernetes version. If not provided, it defaults to the current cluster version
 
 ``--helm-binary``
-    The helm binary to be used for running helm commands. Default is helm v2. Use "helm" for helm V2 and "helm3" for helm V3
+    The helm binary to be used. Default is helm v2. Use "helm" for helm V2 and "helm3" for helm V3
 
 ``--output-dir``
     The output directory used to template the chart

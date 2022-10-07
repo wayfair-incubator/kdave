@@ -25,9 +25,12 @@ from prometheus_client.core import CollectorRegistry
 from exporter.constants import (
     DATA_FILE,
     DEFAULT_VERSIONS_FILE,
+    HELM_2_VERSION,
+    HELM_3_VERSION,
     HELM_TEMPLATE_TMP_DIRECTORY,
     HELM_V2_BINARY,
     HELM_V3_BINARY,
+    MAXIMUM,
 )
 from exporter.exceptions import (
     DeprecatedAPIVersionError,
@@ -50,8 +53,7 @@ from exporter.helper import (
     load_multiple_yaml_documents,
     load_yaml_file,
     parse_duration,
-    put_all_releases_in_queue,
-    put_all_releases_v3_in_queue,
+    put_all_helm_releases_in_queue,
 )
 
 app = Flask(__name__)
@@ -467,7 +469,7 @@ def handle_deprecation_in_files_output(k8s_version: str, files: list):
 
 
 def check_deprecation_for_namespace_releases(
-    helm_binary: str, namespace: str, k8s_version: str = None
+    helm_binary: str, namespace: str, k8s_version: str = None, helm_version: str = None
 ):
     """
     Check the deprecated apiVersions for all the releases in a namespace.
@@ -577,13 +579,19 @@ def raise_api_versions_exception(deprecations: List[Dict]) -> None:
         raise DeprecatedAPIVersionError
 
 
-def get_kinds_from_helm_release(
-    helm_binary: str, release_name: str, namespace: str = None
+def get_kinds_from_helm_release(  # noqa: C901
+    helm_binary: str, release_name: str, namespace: str = None, helm_version: str = None
 ):
     """
     Get all kinds from a helm release a long with the apiVersions to check the deprecation
     """
     result: List = []
+
+    if helm_version == HELM_2_VERSION:
+        helm_binary = HELM_V2_BINARY
+    elif helm_version == HELM_3_VERSION:
+        helm_binary = HELM_V3_BINARY
+
     try:
         release_info = helm_get(helm_binary, release_name, namespace)
     except HelmCommandError:
@@ -612,7 +620,11 @@ def get_kinds_from_helm_release(
 
 
 def get_deployed_deprecated_kinds(
-    helm_binary: str, release_name: str, namespace: str = None, k8s_version: str = None
+    helm_binary: str,
+    release_name: str,
+    namespace: str = None,
+    k8s_version: str = None,
+    helm_version: str = None,
 ):
     """
     Get the deprecated apiVersions for the deployed kinds which are fetched from a helm release.
@@ -620,7 +632,9 @@ def get_deployed_deprecated_kinds(
     result: List = []
     version = k8s_version if k8s_version else _k8s_version()
 
-    kinds = get_kinds_from_helm_release(helm_binary, release_name, namespace)
+    kinds = get_kinds_from_helm_release(
+        helm_binary, release_name, namespace, helm_version
+    )
 
     if not kinds:
         return result
@@ -657,6 +671,7 @@ def handle_release_deprecation(  # noqa: C901
                 release_info["name"],
                 release_info["namespace"],
                 k8s_version=k8s_version,
+                helm_version=release_info["helm_version"],
             )
             deprecated = "false"
             removed = "false"
@@ -670,6 +685,8 @@ def handle_release_deprecation(  # noqa: C901
             releases.append(
                 {
                     "release_name": release_info["name"],
+                    "namespace": release_info["namespace"],
+                    "helm_version": release_info["helm_version"],
                     "has_deprecated_api_versions": deprecated,
                     "has_removed_api_versions": removed,
                 }
@@ -677,6 +694,7 @@ def handle_release_deprecation(  # noqa: C901
 
             for dep in deprecated_kinds:
                 dep["release_last_update"] = release_info["release_last_update"]
+                dep["helm_version"] = release_info["helm_version"]
 
                 result.append(dep)
         except queue.Empty:
@@ -707,10 +725,11 @@ def get_deprecations_for_all_releases(
     error_event: threading.Event,
     helm_binary: str,
     k8s_version: str,
+    max: int,
     app_data=app_data,
     lock=lock,
     data_file: str = DATA_FILE,
-    max: int = None,
+    helm_version: str = None,
 ):
 
     set_trigger_flag(lock, app_data=app_data)
@@ -729,11 +748,7 @@ def get_deprecations_for_all_releases(
         start = time.time()
 
         put_releases_in_queue = threading.Thread(
-            target=(
-                put_all_releases_v3_in_queue
-                if helm_binary == HELM_V3_BINARY
-                else put_all_releases_in_queue
-            ),
+            target=put_all_helm_releases_in_queue,
             name="put_releases_in_queue",
             daemon=True,
             kwargs={
@@ -742,6 +757,7 @@ def get_deprecations_for_all_releases(
                 "exit_event": exit_event,
                 "error_event": error_event,
                 "max": max,
+                "helm_version": helm_version,
             },
         )
 
@@ -863,11 +879,12 @@ def export_deprecated_versions_metrics(
     error_event: threading.Event,
     helm_binary: str,
     k8s_version: str,
+    max: int,
     app_data: dict = app_data,
     lock=lock,  # Manager.Lock
     data_file: str = DATA_FILE,
     run_once: bool = False,
-    max: int = None,
+    helm_version: str = None,
 ):
 
     while True:
@@ -881,10 +898,11 @@ def export_deprecated_versions_metrics(
                 error_event,
                 helm_binary,
                 k8s_version,
-                max=max,
+                max,
                 app_data=app_data,
                 lock=lock,
                 data_file=data_file,
+                helm_version=helm_version,
             )
 
         if run_once:
@@ -953,6 +971,7 @@ def get_metrics():
             "name",
             "release_name",
             "namespace",
+            "helm_version",
             "replacement_api",
             "deprecated_in_version",
             "removed_in_version",
@@ -1006,6 +1025,7 @@ def get_metrics():
             metric["name"],
             metric["release_name"],
             metric["namespace"],
+            metric["helm_version"],
             metric["replacement_api"],
             metric["deprecated_in_version"],
             metric["removed_in_version"],
@@ -1066,7 +1086,11 @@ def get_arguments():
         default="2h",
     )
     parser.add_argument(
-        "-m", "--max", help="Maximum number of releases to fetch", type=int
+        "-m",
+        "--max",
+        help="Maximum number of releases to fetch",
+        type=int,
+        default=MAXIMUM,
     )
     parser.add_argument(
         "-d",
@@ -1082,6 +1106,13 @@ def get_arguments():
         type=str,
         default=HELM_V2_BINARY,
     )
+    parser.add_argument(
+        "-e",
+        "--helm-version",
+        help='The helm version to be used to collect the deployed releases. This argument can be used to collect the releases of helm v2 and helm v3 simultaneously. Default is v2. Use "v2" for helm V2, "v3" for helm V3, and "v23" for both helm v2 and v3 releases. When providing this argument, helm binary is not considered since the default binary of the provided helm version will be used',
+        type=str,
+        default=None,
+    )
     args = parser.parse_args()
 
     return args
@@ -1091,7 +1122,9 @@ if __name__ == "__main__":
     args = get_arguments()
     interval = args.interval
     delay = args.delay
+    max = args.max
     helm_binary = args.helm_binary
+    helm_version = args.helm_version
     q: queue.Queue = queue.Queue()
     exit_event = threading.Event()
     error_event = threading.Event()
@@ -1108,8 +1141,8 @@ if __name__ == "__main__":
     helm = multiprocessing.Process(
         name="helm-handler",
         target=export_deprecated_versions_metrics,
-        args=(args.threads, q, exit_event, error_event, helm_binary, k8s_version),
-        kwargs={"data_file": args.data_file, "max": args.max},
+        args=(args.threads, q, exit_event, error_event, helm_binary, k8s_version, max),
+        kwargs={"data_file": args.data_file, "helm_version": args.helm_version},
     )
 
     flask_app.start()
