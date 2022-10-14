@@ -19,3 +19,8 @@ jobs:
       with:
         config: '.markdownlint.json'
         args: '**/*.md .github/**/*.md'
+
+    - name: 🧼 lint renovate config # Validates changes to renovate.json config file
+      uses: suzuki-shunsuke/github-action-renovate-config-validator@v0.1.2
+      with:
+        config_file_path: 'renovate.json'
