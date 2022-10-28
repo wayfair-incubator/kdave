@@ -3,6 +3,5 @@
   "extends": [
     "config:base",
     "schedule:daily"
-  ],
-  "enabledManagers": ["github-actions"]
+  ]
 }
