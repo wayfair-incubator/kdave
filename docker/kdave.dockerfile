@@ -2,7 +2,7 @@
 #
 # Kubernetes Deprecated API Versions Exporter CLI
 
-FROM python:3.8-buster
+FROM python:3.11-buster
 
 ARG USER_NAME=app
 ARG USER_ID=1003
