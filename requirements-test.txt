@@ -1,5 +1,5 @@
 mypy==0.761
-flake8==3.7.5
+flake8==3.9.2
 bandit==1.6.2
 black==18.9b0
 pytest==5.2.0
