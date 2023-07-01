@@ -1,6 +1,6 @@
 mypy==0.761
 flake8==3.7.5
-bandit==1.6.2
+bandit==1.7.5
 black==18.9b0
 pytest==5.2.0
 pytest-cov==2.6.1
